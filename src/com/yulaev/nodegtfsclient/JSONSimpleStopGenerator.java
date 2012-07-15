@@ -3,12 +3,27 @@ package com.yulaev.nodegtfsclient;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+/** This class implements a Generator that takes JSONObject Objects representing
+ * a transit stop and converts them into SimpleStop Objects. Ideally this would
+ * be built into the SimpleStop class as an additional constructor but due to 
+ * compatibility requirements with legacy systems (AnyStop in particular) the 
+ * SimpleStop object could not be modified and so this Generator was built to 
+ * "construct" SimpleStop objects from JSONObjects.
+ *  
+ * @author ivany
+ *
+ */
 
 public class JSONSimpleStopGenerator {
 	
 	//Serial version ID for this JSONSimpleStop Object (version)
 	//private static final long serialVersionUID = 1L;
 
+	/** This method takes a JSONObject representing a transit stop and returns a 
+	 * SimpleStop object that can be used elsewhere in a Java-based program.
+	 * @param stopObject JSONObject representing transit stop
+	 * @return SimpleStop representing the same data as the JSONObject.
+	 */
 	public static SimpleStop jsonToSimpleStop(JSONObject stopObject) {
 		SimpleStop returned = new SimpleStop();
 		

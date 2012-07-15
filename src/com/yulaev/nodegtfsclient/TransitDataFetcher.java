@@ -239,6 +239,23 @@ public class TransitDataFetcher {
 		return(jsonStringToStopList(jsonStopList));
 	}
 	
+	/** This method returns a List of Predictions given an agecy, route_id, stop_id, and an optional
+	 * direction
+	 * @param agency Agency key for prediction
+	 * @param route_id Route ID key for prediction
+	 * @param stop_id Stop ID key for prediction
+	 * @param direction The Direction to get predictions for (optional!)
+	 * @return A List of predicted times (Prediction Objects) for the stop/direction represented by
+	 * the parameters. For detailed information on what the Predictions represent see the overview
+	 * of the Prediction class, in Prediction.java.
+	 */
+	public ArrayList<Prediction> fetchPredictionByStop(String agency, String route_id, String stop_id, String direction) {
+		return(null);
+	}
+	public ArrayList<Prediction> fetchPredictionByStop(String agency, String route_id, String stop_id) {
+		return(fetchPredictionByStop(agency, route_id, stop_id, null));
+	}
+	
 	/** The main() method simply implements some tests (which are enabled/disabled by the boolean "defines" 
 	 * at the top of the TransitDataFetcher class). 
 	 * @param args
