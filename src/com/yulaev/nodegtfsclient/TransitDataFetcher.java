@@ -15,6 +15,9 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.GregorianCalendar;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -25,7 +28,8 @@ public class TransitDataFetcher {
 	//These "defines" will determine which debugging tests/messages get run in the main() function
 	private static final boolean TEST_ROUTE_BY_AGENCY = false;
 	private static final boolean TEST_STOP_BY_ROUTE = false;
-	private static final boolean TEST_ROUTE_BY_LOC = true;
+	private static final boolean TEST_ROUTE_BY_LOC = false;
+	private static final boolean TEST_ROUTE_STOP_TIMES = true;
 	
 	//Used to put together URLs pointing to API endpoints on the node-gtfs server
 	private NodeGtfsUrlMaker urlMakr;
@@ -140,6 +144,57 @@ public class TransitDataFetcher {
 		return(stopList);	
 	}
 	
+	/** Converts a JSON-formatted string representing times to a Predictions object, or a set of
+	 * predictions objects.
+	 * TODO: Doesn't handle multiple directions in the same list correctly.
+	 * 
+	 * @param jsonString String representing a list or multiple lists of transit stop times (JSON formatted)
+	 * @return ArrayList of Predictions objects, one per direction (assumes that all times correspond to the same stop)
+	 */
+	private static ArrayList<Prediction> jsonStringToPredictionList( String jsonString ) {
+		JSONArray jsonSimpleStopObjectArray = null;
+		try { jsonSimpleStopObjectArray = new JSONArray(jsonString); }
+		catch (JSONException e) { System.err.println(e); }
+		
+		//Convert JSONArray to ArrayList of Route objects
+		ArrayList <Prediction> predictionList = new ArrayList<Prediction>();
+		if(jsonSimpleStopObjectArray != null) {
+			int [] predSecs = new int[jsonSimpleStopObjectArray.length()];
+			for(int i = 0; i < jsonSimpleStopObjectArray.length(); i++) {
+				String time;
+				
+				try { time = (String) jsonSimpleStopObjectArray.getString(i); }
+				catch (JSONException e) { System.err.println(e); time = null; }
+				
+				if(time != null) {
+					time = time.replaceAll("\\s+", ""); //remove whitespace 
+					String [] components = time.split(":"); //split by colons
+					
+					try {
+						//We assume that the returned times are in the same timezone that we are in
+						//TODO: doesn't deal with midnight roll-over - how do we deal with this?
+						Calendar cal = new GregorianCalendar();
+						int hour = Integer.parseInt(components[0]) - cal.get(Calendar.HOUR_OF_DAY);
+						int minute = Integer.parseInt(components[1]) - cal.get(Calendar.MINUTE);
+						int second = Integer.parseInt(components[2]) - cal.get(Calendar.SECOND);
+						predSecs[i] = hour * 60 * 60 + minute * 60 + second;
+					} catch (NumberFormatException e) { predSecs[i] = 0; }
+				}
+			}
+			
+			predictionList.add(new Prediction(predSecs, false));
+			
+		} else {
+			System.out.println("No objects in jsonRouteObjectArray! Terminating...");
+			return predictionList;
+		}
+
+		//Remove invalid entries (not implemented for SimpleStops yet)
+		//for(int i = 0; i < stopList.size(); i++) if(stopList.get(i).isValid()) stopList.remove(i);
+		
+		return(predictionList);
+	}
+	
 	/** This method fetches a list of Routes based on latitude and longitude. Overloaded versions exist 
 	 * where lat and lon can be passed in as doubles (in floating-point degrees). 
 	 * @param lat The latitude (in microdegrees) 
@@ -193,6 +248,7 @@ public class TransitDataFetcher {
 		return(jsonStringToStopList(jsonStopList)); //Convert to list of routes
 	}
 	
+	
 	/*public ArrayList<SimpleStop> fetchStopListByLatLon(double lat, double lon, double radius) {
 		String urlStr = urlMakr.getStopsByLoc(lat, lon, radius); //get URL for API endpoint
 		String jsonStopList = jsonStringFromURLString(urlStr); //get JSON-formatted route list
@@ -204,6 +260,8 @@ public class TransitDataFetcher {
 		String jsonStopList = jsonStringFromURLString(urlStr); //get JSON-formatted route list
 		return(jsonStringToStopList(jsonStopList)); //Convert to list of routes
 	}*/
+	
+	
 	/**
 	 * @param apiEndpointRouteListURL String representing the URL to fetch JSON route list from
 	 * @return ArrayList of Route Objects that has all of the routes filled in per the JSON at the URL
@@ -239,7 +297,7 @@ public class TransitDataFetcher {
 		return(jsonStringToStopList(jsonStopList));
 	}
 	
-	/** This method returns a List of Predictions given an agecy, route_id, stop_id, and an optional
+	/** This method returns a List of Predictions given an agency, route_id, stop_id, and an optional
 	 * direction
 	 * @param agency Agency key for prediction
 	 * @param route_id Route ID key for prediction
@@ -250,7 +308,9 @@ public class TransitDataFetcher {
 	 * of the Prediction class, in Prediction.java.
 	 */
 	public ArrayList<Prediction> fetchPredictionByStop(String agency, String route_id, String stop_id, String direction) {
-		return(null);
+		String urlStr = urlMakr.getStopDetails(agency, route_id, stop_id, direction);
+		String jsonTimesList = jsonStringFromURLString(urlStr);
+		return(jsonStringToPredictionList(jsonTimesList));	
 	}
 	public ArrayList<Prediction> fetchPredictionByStop(String agency, String route_id, String stop_id) {
 		return(fetchPredictionByStop(agency, route_id, stop_id, null));
@@ -263,7 +323,7 @@ public class TransitDataFetcher {
 	public static void main(String [] args) {
 		int error_count = 0;
 		
-		final String serverUrl = "http://192.168.111.113:8081";
+		final String serverUrl = "http://192.168.1.21:8081";
 		
 		if(TEST_ROUTE_BY_AGENCY) {
 			TransitDataFetcher testEngine = new TransitDataFetcher(serverUrl);
@@ -310,6 +370,12 @@ public class TransitDataFetcher {
 			
 			/*System.out.println("Fetched the string:");
 			System.out.print(jsonString);*/
+		}
+		
+		if(TEST_ROUTE_STOP_TIMES) {
+			TransitDataFetcher testEngine = new TransitDataFetcher(serverUrl);
+			
+			testEngine.fetchPredictionByStop("abq-ride", "1914", "6384");
 		}
 		
 		System.err.printf("Got %d errors, %s", error_count, error_count>0?"FAIL":"PASS");
